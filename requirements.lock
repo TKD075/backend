@@ -1,0 +1,9 @@
+asgiref==3.8.1
+Django==5.1.2
+djangorestframework==3.15.2
+gitdb==4.0.11
+GitPython==3.1.41
+mysqlclient==2.2.5
+setuptools==69.0.3
+smmap==5.0.1
+sqlparse==0.5.1
