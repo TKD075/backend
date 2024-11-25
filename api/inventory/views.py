@@ -2,11 +2,15 @@ from api.inventory import serializers
 from api.inventory.exception import BusinessException
 from django.db.models import F, Value, Sum
 from django.db.models.functions import Coalesce
+from django.conf import settings
 from rest_framework.viewsets import ModelViewSet
 from rest_framework.views import APIView
+from rest_framework import generics, status, views, viewsets
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework.exceptions import NotFound
-from rest_framework import status
 from .models import Product, Purchase, Sales
 from .serializers import InventorySerializer, ProductSerializer, PurchaseSerializer, SaleSerializer
 
@@ -14,6 +18,12 @@ class ProductView(APIView):
     """
     商品操作に関する関数
     """
+
+    # 認証クラスの指定
+    authentication_classes = [JWTAuthentication]
+    # アクセス許可の指定
+    # 認証済みのリクエストのみ許可
+    permission_classes = [IsAuthenticated]
 
     # 商品操作に関する関数で共通で使用する商品取得関数
     def get_object(self, pk):
@@ -106,3 +116,29 @@ class InventoryView(APIView):
             queryset = purchase.union(sales).order_by(F("date"))
             serializer = InventorySerializer(queryset, many=True)
         return Response(serializer.data, status.HTTP_200_OK)
+    
+class LoginView(APIView):
+    """
+    ユーザーのログイン処理
+
+    Args:
+        APIView(class): rest_framework.viewsのAPIViewを受け取る
+    """
+    # 認証クラスの指定
+    # リクエストヘッダーにtokenを差し込むといったカスタム動作をしないので素の認証クラスを使用する
+    authentication_classes = [JWTAuthentication]
+    # アクセス許可の指定
+    permission_classes = []
+
+    def post(self, request):
+        serializer = TokenObtainPairSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        access = serializer.validated_data.get("access", None)
+        refresh = serializer.validated_data.get("refresh", None)
+        if access:
+            response = Response(status=status.HTTP_200_OK)
+            max_age = settings.COOKIE_TIME
+            response.set_cookie('access', access, httponly=True, max_age=max_age)
+            response.set_cookie('refresh', refresh, httponly=True, max_age=max_age)
+            return response
+        return Response({'errMsg': 'ユーザーの認証に失敗しました'}, status=status.HTTP_401_UNAUTHORIZED)
